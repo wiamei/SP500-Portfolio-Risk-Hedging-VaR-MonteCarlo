@@ -1,124 +1,139 @@
 # Portfolio Risk Analysis and Hedging with European Put Options (Excel VBA + Monte Carlo)
 
-This project implements a complete risk analysis of a 1,000,000$ portfolio replicating 
-the S&P 500 index over a 10-day horizon. To protect the investor against large market losses,
-the analysis evaluates the effect of purchasing European put options.
-
-All computations (analytical VaR, Monte Carlo simulation, and Black-Scholes pricing) 
-are implemented in **Excel VBA**, making the project fully reproducible and transparent.
+This project performs a complete risk analysis of a 1,000,000 $ portfolio replicating the S&P 500 index over a 10-day horizon. The goal is to measure portfolio risk and evaluate the effect of hedging with European put options. All computations ( analytical Value-at-Risk (VaR), Monte Carlo simulation, and Black-Scholes pricing ) are implemented in **Excel VBA**.
 
 ---
 
-##  Objectives of the project
+## Objectives
 
-- Compute **Value-at-Risk (VaR)** of an unhedged SP500 portfolio using an **analytical normal model**.
-- Compute **simulated VaR** using **Monte Carlo simulation**.
-- Price European **put options** using the **Black-Scholes** formula.
-- Evaluate the effect of purchasing puts on:
-  - expected profit,
-  - portfolio volatility,
-  - tail-risk (VaR at 99%),
-  - minimum value preserved in extreme events.
-- Provide a recommendation for a reasonable strike price and hedge amount.
-
-This is a practical exercise in **market risk management**, **derivative hedging**, and **quantitative modelling**.
-
----
-
-# **Key Concepts Used**
-
-Below are the main financial and mathematical concepts implemented in this project.
+- Compute analytical Value-at-Risk (VaR) for an unhedged SP500 portfolio.
+- Compute simulated VaR using Monte Carlo simulation.
+- Price European put options using the Black-Scholes model.
+- Compare hedged vs unhedged portfolios.
+- Evaluate the impact of hedging on:
+  - expected profit  
+  - volatility  
+  - 99% VaR (tail-risk)  
+  - minimum value preserved  
+- Recommend a strike price and hedge amount.
 
 ---
 
-##  Daily Returns (Simple Returns)
+## Key Concepts
 
-Given price series \( P_t \), daily simple returns are:
+### 1. Daily Returns (Simple Returns)
 
-\[
-r_t = \frac{P_t - P_{t-1}}{P_{t-1}}
-\]
+Daily return:
+```
+r_t = (P_t - P_(t-1)) / P_(t-1)
+```
 
-These returns are used to estimate:
-- empirical mean \( \mu \)
-- empirical volatility \( \sigma \)
+Used to estimate:
+- average daily return `mu`)
+- daily volatility `sigma`)
 
-Assumption: returns follow a **normal distribution**, standard in basic VaR modelling.
+Assume normal distribution of returns.
 
 ---
 
-##  Value-at-Risk (VaR)
+### 2. Analytical Value-at-Risk (VaR)
 
-The VaR at level \( \alpha \) is defined as the **maximum loss** over a horizon 
-such that the probability of exceeding it is \( \alpha \).
+Multi-day scaling:
+```
+Mean_Profit = mu * T * invested_amount
+StdDev_Profit = sigma * sqrt(T) * invested_amount
+```
 
-\[
-\text{VaR}_{\alpha} = - \left( \mu_P + \sigma_P \, \Phi^{-1}(\alpha) \right)
-\]
+Analytical VaR at confidence `alpha`:
+```
+VaR(alpha) = - ( Mean_Profit + Z(alpha) * StdDev_Profit )
+```
 
-where:
-- \( \mu_P \) = expected 10-day profit,
-- \( \sigma_P \) = volatility of 10-day profit,
-- \( \Phi^{-1} \) = inverse standard normal CDF.
+Where:
+- `Z(alpha)` = standard normal quantile (ex: Z(99%) = 2.33)
+- VaR is expressed as a positive loss
 
 Interpretation:
-
-> “With probability \( 1 - \alpha \), the portfolio will not lose more than VaR.”
-
-We compute VaR **without puts** (unhedged portfolio) and **with puts** (hedged portfolio).
+> With probability (1 − alpha), the portfolio will not lose more than the VaR amount.
 
 ---
 
-##  Monte Carlo Simulation
+### 3. Monte Carlo Simulation
 
-To evaluate the distribution of profits with options, we generate future prices:
+Simulated future SP500 price:
+```
+S_T = S_0 + mu * S_0 * T + sigma * S_0 * sqrt(T) * RandomNormal()
+```
 
-\[
-S_T = S_0 \left( 1 + \mu \, T + \sigma \sqrt{T} Z \right)
-\]
+Portfolio components:
+```
+Underlying Profit = (S_T - S_0) / S_0 * montant_S
+Put Payoff = max(K - S_T, 0)
+Total Profit = Underlying Profit + nbOptions * Put Payoff - montant_P
+```
 
-where \( Z \sim N(0,1) \).
-
-For each simulated price, we compute:
-
-- SP500 profit
-- put payoff \( \max(K - S_T, 0) \)
-- total portfolio profit
-
-This provides an **empirical distribution** of profits → we compute the simulated VaR.
+Sorting simulated profits → extract empirical VaR.
 
 ---
 
-##  Black-Scholes Pricing (European Put)
+### 4. Black-Scholes Pricing (European Put)
 
-The project uses the standard **Black-Scholes formula** for the price of a European put:
+Inputs: S0, K, r, T, sigma
+```
+d1 = [ ln(S0/K) + (r + 0.5sigma^2)T ] / (sigma*sqrt(T))
+d2 = d1 - sigma*sqrt(T)
+```
 
-\[
-P = Ke^{-rT}\Phi(-d_2) - S_0\Phi(-d_1)
-\]
+Put price:
+```
+PutPrice = K * exp(-r*T) * N(-d2) - S0 * N(-d1)
+```
 
-This gives the price per option.  
-We compute:
-
-\[
-\text{Number of options purchased} 
-= \frac{\text{Amount invested in puts}}{\text{Option price}}
-\]
+Number of puts purchased:
+```
+nbOptions = montant_P / PutPrice
+```
 
 ---
 
-#  **VBA Implementation**
+## VBA Implementation
 
-The repo includes the following VBA modules:
-
-### **1. `VaR.bas`**
-Implements:
-
+### 1. VaR.bas — Analytical VaR
 ```vb
-Function MoyenEcartVaR(vecPrix, montant, alpha, nbJours)
+Function MoyenEcartVaR(vecPrix As Range, MontantInvesti As Double, alpha As Double, nbJours As Integer)
+```
 
-### **1. `VaR.bas`**
-Implements:
+Features:
+- Computes daily returns
+- Estimates mean & volatility
+- Scales them to multi-day horizon
+- Computes analytical VaR
 
-Function MoyenEcartVaR_avecOptionVente(S0, montant_S, montant_P, K, r, mu, sigma, alpha, nbJours, nbSim)
+Returns: mean profit, standard deviation, VaR
 
+---
+
+### 2. VaR_hedged.bas — Monte Carlo VaR with Put Options
+```vb
+Function MoyenEcartVaR_avecOptionVente( _
+    S0 As Double, montant_S As Double, montant_P As Double, K As Double, _
+    r As Double, mu As Double, sigma As Double, alpha As Double, _
+    nbJours As Double, nbSim As Long)
+```
+
+Features:
+- Prices puts with Black-Scholes
+- Simulates SP500 future prices
+- Computes hedged portfolio profit
+- Extracts simulated mean, volatility, and VaR
+
+---
+
+### 3. Bl_Sch_Benninga.bas — Black-Scholes Module
+
+Contains:
+- Normal CDF
+- Computation of d1 and d2
+- European put pricing formula
+
+Used by the hedged VaR module
